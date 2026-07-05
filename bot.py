@@ -2,7 +2,12 @@ import requests
 import datetime
 import pytz
 import jdatetime
+import time
+import logging
 from config import ASSETS, BOT_TOKEN_BALE, CHANNEL_ID_BALE, TOKEN_RUBIKA, CHANNEL_ID_RUBIKA, TOKEN_TELEGRAM, CHAT_ID_TELEGRAM
+
+# Logging setup
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def get_persian_datetime_str():
@@ -43,24 +48,33 @@ def format_message(data_pairs):
 
 
 def send_to_bale(message):
-    url = f"https://tapi.bale.ai/bot{BOT_TOKEN_BALE}/sendMessage"
-    requests.post(url, data={"chat_id": CHANNEL_ID_BALE, "text": message, "parse_mode": "HTML"})
+    try:
+        url = f"https://tapi.bale.ai/bot{BOT_TOKEN_BALE}/sendMessage"
+        requests.post(url, data={"chat_id": CHANNEL_ID_BALE, "text": message, "parse_mode": "HTML"}, timeout=10)
+    except Exception as e:
+        logging.error(f"Bale send error: {e}")
 
 
 def send_to_rubika(message):
-    url = f"https://botapi.rubika.ir/v3/{TOKEN_RUBIKA}/sendMessage"
-    requests.post(url, json={"chat_id": CHANNEL_ID_RUBIKA, "text": message, "parse_mode": "HTML"})
+    try:
+        url = f"https://botapi.rubika.ir/v3/{TOKEN_RUBIKA}/sendMessage"
+        requests.post(url, json={"chat_id": CHANNEL_ID_RUBIKA, "text": message, "parse_mode": "HTML"}, timeout=10)
+    except Exception as e:
+        logging.error(f"Rubika send error: {e}")
 
 
 def send_to_telegram(message):
-    url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-    data = {
-        "chat_id": CHAT_ID_TELEGRAM,
-        "text": message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    requests.post(url, data=data, timeout=15)
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
+        data = {
+            "chat_id": CHAT_ID_TELEGRAM,
+            "text": message,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }
+        requests.post(url, data=data, timeout=15)
+    except Exception as e:
+        logging.error(f"Telegram send error: {e}")
 
 
 def fetch_prices():
@@ -72,6 +86,7 @@ def fetch_prices():
 
     try:
         response = session.get("https://www.tala.ir/banner/", timeout=30)
+        response.raise_for_status()
         data = response.json()
         prices = data.get("price", {})
 
@@ -79,14 +94,17 @@ def fetch_prices():
 
         message = format_message(collected)
         print(message)
+        logging.info("Prices fetched successfully")
 
         send_to_bale(message)
         send_to_rubika(message)
         send_to_telegram(message)
 
     except Exception as e:
-        print(f"خطا: {e}")
+        logging.error(f"Fetch prices error: {e}")
 
 
 if __name__ == "__main__":
-    fetch_prices()
+    while True:
+        fetch_prices()
+        time.sleep(300)  # هر ۵ دقیقه
